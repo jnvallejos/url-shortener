@@ -64,4 +64,8 @@ public sealed class ShortUrl : Entity
             UserAgent: userAgent,
             IpAddress: ipAddress));
     }
+
+    public void Disable() => IsEnabled = false;
+
+    public void Enable() => IsEnabled = true;
 }
