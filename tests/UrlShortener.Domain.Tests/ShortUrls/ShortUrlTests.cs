@@ -224,4 +224,64 @@ public class ShortUrlTests
         act.Should().Throw<ShortUrlExpiredException>()
             .Where(e => e.Message.Contains("abc1234") && e.Message.Contains(future.ToString("O")));
     }
+
+    [Fact]
+    public void UpdateExpiration_WithFutureDate_UpdatesExpiresAt()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        var future = DateTime.UtcNow.AddDays(30);
+
+        shortUrl.UpdateExpiration(future);
+
+        shortUrl.ExpiresAt.Should().Be(future);
+    }
+
+    [Fact]
+    public void UpdateExpiration_WithNull_ClearsExpiration()
+    {
+        var future = DateTime.UtcNow.AddDays(30);
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl(), expiresAt: future);
+
+        shortUrl.UpdateExpiration(null);
+
+        shortUrl.ExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void UpdateExpiration_WithPastDate_ThrowsDomainException()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        var past = DateTime.UtcNow.AddDays(-1);
+
+        Action act = () => shortUrl.UpdateExpiration(past);
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void UpdateExpiration_OnDisabledShortUrl_AllowsUpdate()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        shortUrl.Disable();
+        var future = DateTime.UtcNow.AddDays(30);
+
+        Action act = () => shortUrl.UpdateExpiration(future);
+
+        act.Should().NotThrow();
+        shortUrl.ExpiresAt.Should().Be(future);
+    }
+
+    [Fact]
+    public void UpdateExpiration_OnExpiredShortUrl_AllowsUpdate()
+    {
+        // Create with a near-future expiration, then wait the clock past it.
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl(), expiresAt: DateTime.UtcNow.AddMilliseconds(50));
+        Thread.Sleep(100); // ensure ExpiresAt is now in the past
+        var newFuture = DateTime.UtcNow.AddDays(7);
+
+        Action act = () => shortUrl.UpdateExpiration(newFuture);
+
+        act.Should().NotThrow();
+        shortUrl.ExpiresAt.Should().Be(newFuture);
+    }
 }
