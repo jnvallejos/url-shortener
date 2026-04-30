@@ -154,4 +154,42 @@ public class OriginalUrlTests
 
         act.Should().Throw<InvalidOriginalUrlException>();
     }
+
+    [Fact]
+    public void Create_WithIdnDomain_NormalizesToPunycode()
+    {
+        var url = OriginalUrl.Create("https://例え.jp");
+
+        url.ToString().Should().Contain("xn--");
+        url.ToString().Should().StartWith("https://");
+    }
+
+    [Fact]
+    public void Create_WithUnicodePath_PreservesPath()
+    {
+        var url = OriginalUrl.Create("https://example.com/café");
+
+        url.ToString().Should().StartWith("https://example.com/");
+        // Unicode path is percent-encoded into the canonical AbsoluteUri form.
+        url.ToString().Should().Contain("caf");
+    }
+
+    [Fact]
+    public void Create_WithQueryStringAndFragment_PreservesBoth()
+    {
+        var url = OriginalUrl.Create("https://example.com/path?q=1&n=2#section");
+
+        var s = url.ToString();
+        s.Should().Contain("?q=1&n=2");
+        s.Should().Contain("#section");
+    }
+
+    [Fact]
+    public void ToString_ReturnsNormalizedAbsoluteUri()
+    {
+        var url = OriginalUrl.Create("HTTPS://EXAMPLE.com/Path");
+
+        // Scheme and host normalize to lowercase; path case is preserved.
+        url.ToString().Should().StartWith("https://example.com/");
+    }
 }
