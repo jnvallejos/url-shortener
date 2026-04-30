@@ -189,4 +189,39 @@ public class ShortUrlTests
         act.Should().NotThrow();
         shortUrl.IsEnabled.Should().BeTrue();
     }
+
+    [Fact]
+    public void RegisterClick_OnDisabled_ThrowsDomainException()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        shortUrl.Disable();
+
+        Action act = () => shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void RegisterClick_OnExpired_ThrowsShortUrlExpiredException()
+    {
+        var future = DateTime.UtcNow.AddMinutes(5);
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl(), expiresAt: future);
+
+        Action act = () => shortUrl.RegisterClick(future.AddSeconds(1), null, null);
+
+        act.Should().Throw<ShortUrlExpiredException>();
+    }
+
+    [Fact]
+    public void RegisterClick_OnExpired_ExceptionMessageContainsShortCodeAndExpiresAt()
+    {
+        var future = DateTime.UtcNow.AddMinutes(5);
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl(), expiresAt: future);
+        var clickedAt = future.AddSeconds(1);
+
+        Action act = () => shortUrl.RegisterClick(clickedAt, null, null);
+
+        act.Should().Throw<ShortUrlExpiredException>()
+            .Where(e => e.Message.Contains("abc1234") && e.Message.Contains(future.ToString("O")));
+    }
 }
