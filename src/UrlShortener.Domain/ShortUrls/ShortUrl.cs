@@ -52,4 +52,9 @@ public sealed class ShortUrl : Entity
             isEnabled: true,
             clickCount: 0);
     }
+
+    public void RegisterClick(DateTime clickedAtUtc, string? userAgent, string? ipAddress)
+    {
+        ClickCount++;
+    }
 }
