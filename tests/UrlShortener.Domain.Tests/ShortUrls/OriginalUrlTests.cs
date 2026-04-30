@@ -192,4 +192,55 @@ public class OriginalUrlTests
         // Scheme and host normalize to lowercase; path case is preserved.
         url.ToString().Should().StartWith("https://example.com/");
     }
+
+    [Fact]
+    public void Equals_SameUrlDifferentCasing_AreEqual()
+    {
+        var a = OriginalUrl.Create("HTTPS://Example.COM/Path");
+        var b = OriginalUrl.Create("https://example.com/Path");
+
+        a.Equals(b).Should().BeTrue();
+        (a == b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Equals_WithNull_ReturnsFalse()
+    {
+        var a = OriginalUrl.Create("https://example.com");
+        OriginalUrl? nullUrl = null;
+        object? nullObj = null;
+
+        a.Equals(nullUrl).Should().BeFalse();
+        a.Equals(nullObj).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Equals_WithDifferentType_ReturnsFalse()
+    {
+        var a = OriginalUrl.Create("https://example.com");
+        object other = "https://example.com/";
+
+        a.Equals(other).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ExceptionMessage_OnInvalidScheme_ContainsReceivedScheme()
+    {
+        Action act = () => OriginalUrl.Create("ftp://example.com");
+
+        act.Should().Throw<InvalidOriginalUrlException>()
+            .WithMessage("*ftp*");
+    }
+
+    [Fact]
+    public void ExceptionMessage_OnLengthViolation_ContainsTrimmedLength()
+    {
+        var prefix = "https://example.com/";
+        var input = prefix + new string('a', 2049 - prefix.Length);
+
+        Action act = () => OriginalUrl.Create(input);
+
+        act.Should().Throw<InvalidOriginalUrlException>()
+            .WithMessage("*2049*");
+    }
 }
