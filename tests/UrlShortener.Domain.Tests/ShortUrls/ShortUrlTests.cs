@@ -145,4 +145,48 @@ public class ShortUrlTests
         evt.UserAgent.Should().Be("Mozilla/5.0");
         evt.IpAddress.Should().Be("203.0.113.7");
     }
+
+    [Fact]
+    public void Disable_OnEnabled_SetsIsEnabledFalse()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.Disable();
+
+        shortUrl.IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Disable_OnAlreadyDisabled_IsIdempotent()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        shortUrl.Disable();
+
+        Action act = () => shortUrl.Disable();
+
+        act.Should().NotThrow();
+        shortUrl.IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Enable_OnDisabled_SetsIsEnabledTrue()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        shortUrl.Disable();
+
+        shortUrl.Enable();
+
+        shortUrl.IsEnabled.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Enable_OnAlreadyEnabled_IsIdempotent()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        Action act = () => shortUrl.Enable();
+
+        act.Should().NotThrow();
+        shortUrl.IsEnabled.Should().BeTrue();
+    }
 }
