@@ -55,6 +55,18 @@ public sealed class ShortUrl : Entity
 
     public void RegisterClick(DateTime clickedAtUtc, string? userAgent, string? ipAddress)
     {
+        if (!IsEnabled)
+        {
+            throw new DomainException(
+                $"Cannot register click on disabled ShortUrl '{ShortCode}' (Id: {Id})");
+        }
+
+        if (ExpiresAt.HasValue && clickedAtUtc >= ExpiresAt.Value)
+        {
+            throw new ShortUrlExpiredException(
+                $"ShortUrl '{ShortCode}' expired at '{ExpiresAt.Value:O}'; click attempted at '{clickedAtUtc:O}'");
+        }
+
         ClickCount++;
 
         RaiseDomainEvent(new ShortUrlClickedEvent(
