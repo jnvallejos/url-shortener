@@ -71,4 +71,41 @@ public class ShortCodeTests
         act.Should().Throw<InvalidShortCodeException>()
             .WithMessage("*length 5*");
     }
+
+    [Fact]
+    public void Create_WithWhitespaceValue_ThrowsInvalidShortCodeException()
+    {
+        Action act = () => ShortCode.Create("       ");
+
+        act.Should().Throw<InvalidShortCodeException>();
+    }
+
+    [Theory]
+    [InlineData("abc-123")]
+    [InlineData("abc 123")]
+    [InlineData("abc/123")]
+    [InlineData("abc_123")]
+    public void Create_WithSpecialCharacter_ThrowsInvalidShortCodeException(string value)
+    {
+        Action act = () => ShortCode.Create(value);
+
+        act.Should().Throw<InvalidShortCodeException>();
+    }
+
+    [Fact]
+    public void Create_WithUnicodeCharacter_ThrowsInvalidShortCodeException()
+    {
+        Action act = () => ShortCode.Create("abc12é4");
+
+        act.Should().Throw<InvalidShortCodeException>();
+    }
+
+    [Fact]
+    public void ExceptionMessage_OnInvalidCharacter_ContainsCharacterAndPosition()
+    {
+        Action act = () => ShortCode.Create("abc-123");
+
+        act.Should().Throw<InvalidShortCodeException>()
+            .WithMessage("*position 3*'-'*");
+    }
 }
