@@ -80,4 +80,19 @@ public sealed class ShortUrl : Entity
     public void Disable() => IsEnabled = false;
 
     public void Enable() => IsEnabled = true;
+
+    public void UpdateExpiration(DateTime? newExpiresAt)
+    {
+        if (newExpiresAt.HasValue)
+        {
+            var now = DateTime.UtcNow;
+            if (newExpiresAt.Value <= now)
+            {
+                throw new DomainException(
+                    $"ExpiresAt must be in the future; received '{newExpiresAt.Value:O}', current UTC '{now:O}'");
+            }
+        }
+
+        ExpiresAt = newExpiresAt;
+    }
 }
