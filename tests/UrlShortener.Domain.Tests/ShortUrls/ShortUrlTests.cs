@@ -85,4 +85,26 @@ public class ShortUrlTests
 
         act.Should().Throw<DomainException>();
     }
+
+    [Fact]
+    public void RegisterClick_OnEnabledNotExpired_IncrementsClickCount()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.RegisterClick(DateTime.UtcNow, userAgent: null, ipAddress: null);
+
+        shortUrl.ClickCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RegisterClick_AfterMultipleClicks_AccumulatesCount()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+
+        shortUrl.ClickCount.Should().Be(3);
+    }
 }
