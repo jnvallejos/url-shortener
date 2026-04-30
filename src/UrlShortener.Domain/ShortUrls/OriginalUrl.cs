@@ -44,7 +44,18 @@ public sealed class OriginalUrl : ValueObject
                 $"OriginalUrl scheme must be 'http' or 'https'; received: '{scheme}'");
         }
 
-        return new OriginalUrl(uri.AbsoluteUri);
+        return new OriginalUrl(Normalize(uri));
+    }
+
+    private static string Normalize(Uri uri)
+    {
+        if (string.Equals(uri.Host, uri.IdnHost, StringComparison.Ordinal))
+        {
+            return uri.AbsoluteUri;
+        }
+
+        var builder = new UriBuilder(uri) { Host = uri.IdnHost };
+        return builder.Uri.AbsoluteUri;
     }
 
     public override string ToString() => _value;
