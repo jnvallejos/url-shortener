@@ -103,4 +103,55 @@ public class OriginalUrlTests
 
         url.ToString().Length.Should().Be(2046);
     }
+
+    [Fact]
+    public void Create_WithJavascriptScheme_ThrowsInvalidOriginalUrlException()
+    {
+        Action act = () => OriginalUrl.Create("javascript:alert(1)");
+
+        act.Should().Throw<InvalidOriginalUrlException>();
+    }
+
+    [Fact]
+    public void Create_WithDataScheme_ThrowsInvalidOriginalUrlException()
+    {
+        Action act = () => OriginalUrl.Create("data:text/html,<script>");
+
+        act.Should().Throw<InvalidOriginalUrlException>();
+    }
+
+    [Fact]
+    public void Create_WithFileScheme_ThrowsInvalidOriginalUrlException()
+    {
+        Action act = () => OriginalUrl.Create("file:///c:/secret.txt");
+
+        act.Should().Throw<InvalidOriginalUrlException>();
+    }
+
+    [Fact]
+    public void Create_WithFtpScheme_ThrowsInvalidOriginalUrlException()
+    {
+        Action act = () => OriginalUrl.Create("ftp://example.com");
+
+        act.Should().Throw<InvalidOriginalUrlException>();
+    }
+
+    [Fact]
+    public void Create_WithRelativeUrl_ThrowsInvalidOriginalUrlException()
+    {
+        Action act = () => OriginalUrl.Create("/just/a/path");
+
+        act.Should().Throw<InvalidOriginalUrlException>();
+    }
+
+    [Theory]
+    [InlineData("not-a-url")]
+    [InlineData("http://")]
+    [InlineData("://example.com")]
+    public void Create_WithMalformedUrl_ThrowsInvalidOriginalUrlException(string input)
+    {
+        Action act = () => OriginalUrl.Create(input);
+
+        act.Should().Throw<InvalidOriginalUrlException>();
+    }
 }
