@@ -56,5 +56,12 @@ public sealed class ShortUrl : Entity
     public void RegisterClick(DateTime clickedAtUtc, string? userAgent, string? ipAddress)
     {
         ClickCount++;
+
+        RaiseDomainEvent(new ShortUrlClickedEvent(
+            ShortUrlId: Id,
+            ShortCodeValue: ShortCode.ToString(),
+            ClickedAt: clickedAtUtc,
+            UserAgent: userAgent,
+            IpAddress: ipAddress));
     }
 }
