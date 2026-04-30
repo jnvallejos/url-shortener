@@ -284,4 +284,46 @@ public class ShortUrlTests
         act.Should().NotThrow();
         shortUrl.ExpiresAt.Should().Be(newFuture);
     }
+
+    [Fact]
+    public void DomainEvents_AfterCreate_IsEmpty()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void DomainEvents_AfterRegisterClick_ContainsExactlyOneEvent()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+
+        shortUrl.DomainEvents.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void DomainEvents_AfterMultipleClicks_ContainsEventPerClick()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+
+        shortUrl.DomainEvents.Should().HaveCount(3);
+        shortUrl.DomainEvents.Should().AllBeOfType<ShortUrlClickedEvent>();
+    }
+
+    [Fact]
+    public void DomainEvents_AfterClearDomainEvents_IsEmpty()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+
+        shortUrl.ClearDomainEvents();
+
+        shortUrl.DomainEvents.Should().BeEmpty();
+    }
 }
