@@ -18,6 +18,18 @@ public sealed class OriginalUrl : ValueObject
     {
         var trimmed = value?.Trim() ?? string.Empty;
 
+        if (trimmed.Length == 0)
+        {
+            throw new InvalidOriginalUrlException(
+                "OriginalUrl must not be null, empty, or whitespace");
+        }
+
+        if (trimmed.Length > MaxLength)
+        {
+            throw new InvalidOriginalUrlException(
+                $"OriginalUrl exceeds maximum length of {MaxLength} characters; received length: {trimmed.Length}");
+        }
+
         if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
         {
             throw new InvalidOriginalUrlException(
