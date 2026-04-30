@@ -485,3 +485,5 @@ $RECYCLE.BIN/
 
 # Claude Code local settings
 .claude/
+
+CLAUDE.md
