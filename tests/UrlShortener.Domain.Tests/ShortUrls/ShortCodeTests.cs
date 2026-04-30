@@ -108,4 +108,50 @@ public class ShortCodeTests
         act.Should().Throw<InvalidShortCodeException>()
             .WithMessage("*position 3*'-'*");
     }
+
+    [Fact]
+    public void Equals_TwoShortCodesWithSameValue_AreEqual()
+    {
+        var a = ShortCode.Create("abc1234");
+        var b = ShortCode.Create("abc1234");
+
+        a.Equals(b).Should().BeTrue();
+        (a == b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Equals_TwoShortCodesWithDifferentValue_AreNotEqual()
+    {
+        var a = ShortCode.Create("abc1234");
+        var b = ShortCode.Create("abc1235");
+
+        a.Equals(b).Should().BeFalse();
+        (a != b).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Equals_WithNull_ReturnsFalse()
+    {
+        var a = ShortCode.Create("abc1234");
+
+        a.Equals(null).Should().BeFalse();
+        a.Equals((object?)null).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Equals_WithDifferentType_ReturnsFalse()
+    {
+        var a = ShortCode.Create("abc1234");
+
+        a.Equals("abc1234").Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetHashCode_TwoShortCodesWithSameValue_ReturnSameHash()
+    {
+        var a = ShortCode.Create("abc1234");
+        var b = ShortCode.Create("abc1234");
+
+        a.GetHashCode().Should().Be(b.GetHashCode());
+    }
 }
