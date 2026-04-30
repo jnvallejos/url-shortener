@@ -133,17 +133,20 @@ public class ShortCodeTests
     public void Equals_WithNull_ReturnsFalse()
     {
         var a = ShortCode.Create("abc1234");
+        ShortCode? nullCode = null;
+        object? nullObj = null;
 
-        a.Equals(null).Should().BeFalse();
-        a.Equals((object?)null).Should().BeFalse();
+        a.Equals(nullCode).Should().BeFalse();
+        a.Equals(nullObj).Should().BeFalse();
     }
 
     [Fact]
     public void Equals_WithDifferentType_ReturnsFalse()
     {
         var a = ShortCode.Create("abc1234");
+        object other = "abc1234";
 
-        a.Equals("abc1234").Should().BeFalse();
+        a.Equals(other).Should().BeFalse();
     }
 
     [Fact]
