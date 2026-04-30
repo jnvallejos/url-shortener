@@ -1,6 +1,7 @@
 using FluentAssertions;
 using UrlShortener.Domain.Exceptions;
 using UrlShortener.Domain.ShortUrls;
+using UrlShortener.Domain.ShortUrls.Events;
 
 namespace UrlShortener.Domain.Tests.ShortUrls;
 
@@ -106,5 +107,42 @@ public class ShortUrlTests
         shortUrl.RegisterClick(DateTime.UtcNow, null, null);
 
         shortUrl.ClickCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void RegisterClick_OnEnabledNotExpired_RaisesShortUrlClickedEvent()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.RegisterClick(DateTime.UtcNow, "ua", "1.2.3.4");
+
+        shortUrl.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<ShortUrlClickedEvent>();
+    }
+
+    [Fact]
+    public void RegisterClick_RaisedEvent_ContainsShortUrlIdAndShortCode()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+
+        shortUrl.RegisterClick(DateTime.UtcNow, null, null);
+
+        var evt = shortUrl.DomainEvents.OfType<ShortUrlClickedEvent>().Single();
+        evt.ShortUrlId.Should().Be(shortUrl.Id);
+        evt.ShortCodeValue.Should().Be("abc1234");
+    }
+
+    [Fact]
+    public void RegisterClick_RaisedEvent_ContainsClickedAtAndUserAgentAndIp()
+    {
+        var shortUrl = ShortUrl.Create(AnyShortCode(), AnyOriginalUrl());
+        var clickedAt = DateTime.UtcNow.AddSeconds(-5);
+
+        shortUrl.RegisterClick(clickedAt, "Mozilla/5.0", "203.0.113.7");
+
+        var evt = shortUrl.DomainEvents.OfType<ShortUrlClickedEvent>().Single();
+        evt.ClickedAt.Should().Be(clickedAt);
+        evt.UserAgent.Should().Be("Mozilla/5.0");
+        evt.IpAddress.Should().Be("203.0.113.7");
     }
 }
