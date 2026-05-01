@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Moq;
 using UrlShortener.Application.Abstractions;
+using UrlShortener.Application.Common;
 using UrlShortener.Application.ShortUrls.Create;
 using UrlShortener.Domain.Common;
 using UrlShortener.Domain.ShortUrls;
@@ -147,5 +148,130 @@ public class CreateShortUrlUseCaseTests
         result.Value.OriginalUrl.Should().Be(added.OriginalUrl.ToString());
         result.Value.CreatedAt.Should().Be(added.CreatedAt);
         result.Value.ExpiresAt.Should().Be(added.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidOriginalUrl_ReturnsFailureWithOriginalUrlInvalid()
+    {
+        var request = new CreateShortUrlRequest("not-a-url", null, ValidCustomCode);
+
+        var result = await _sut.ExecuteAsync(request, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("OriginalUrl.Invalid");
+        result.Error.Message.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidOriginalUrl_DoesNotCallRepositoryOrGenerator()
+    {
+        var request = new CreateShortUrlRequest("not-a-url", null, ValidCustomCode);
+
+        await _sut.ExecuteAsync(request, CancellationToken.None);
+
+        _repo.Verify(
+            r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+        _generator.Verify(
+            g => g.GenerateAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidCustomCode_ReturnsFailureWithShortCodeInvalid()
+    {
+        var request = CustomCodeRequest(customCode: "abc");
+
+        var result = await _sut.ExecuteAsync(request, CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("ShortCode.Invalid");
+        result.Error.Message.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithInvalidCustomCode_DoesNotCallRepository()
+    {
+        var request = CustomCodeRequest(customCode: "abc");
+
+        await _sut.ExecuteAsync(request, CancellationToken.None);
+
+        _repo.Verify(
+            r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDuplicateCustomCode_ReturnsFailureWithCodeAlreadyExists()
+    {
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var result = await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("ShortUrl.CodeAlreadyExists");
+        result.Error.Message.Should().Contain(ValidCustomCode);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithDuplicateCustomCode_DoesNotCallAddOrSave()
+    {
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        _repo.Verify(
+            r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPastExpiration_ReturnsFailureWithInvalidExpiration()
+    {
+        var pastExpiration = DateTime.UtcNow.AddHours(-1);
+
+        var result = await _sut.ExecuteAsync(
+            CustomCodeRequest(expiresAt: pastExpiration),
+            CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Validation.InvalidExpiration");
+        result.Error.Message.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithPastExpiration_DoesNotCallAddOrSave()
+    {
+        var pastExpiration = DateTime.UtcNow.AddHours(-1);
+
+        await _sut.ExecuteAsync(
+            CustomCodeRequest(expiresAt: pastExpiration),
+            CancellationToken.None);
+
+        _repo.Verify(
+            r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 }
