@@ -1,0 +1,151 @@
+using FluentAssertions;
+using Moq;
+using UrlShortener.Application.Abstractions;
+using UrlShortener.Application.ShortUrls.Create;
+using UrlShortener.Domain.Common;
+using UrlShortener.Domain.ShortUrls;
+
+namespace UrlShortener.Application.Tests.ShortUrls;
+
+public class CreateShortUrlUseCaseTests
+{
+    private const string ValidUrl = "https://example.com/path";
+    private const string ValidCustomCode = "abc1234";
+
+    private readonly Mock<IShortUrlRepository> _repo = new();
+    private readonly Mock<IShortCodeGenerator> _generator = new();
+    private readonly Mock<IDomainEventDispatcher> _dispatcher = new();
+    private readonly List<string> _callLog = new();
+    private readonly CreateShortUrlUseCase _sut;
+
+    public CreateShortUrlUseCaseTests()
+    {
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        _repo
+            .Setup(r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()))
+            .Callback(() => _callLog.Add("Add"))
+            .Returns(Task.CompletedTask);
+
+        _repo
+            .Setup(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => _callLog.Add("Save"))
+            .Returns(Task.CompletedTask);
+
+        _dispatcher
+            .Setup(d => d.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .Callback(() => _callLog.Add("Dispatch"))
+            .Returns(Task.CompletedTask);
+
+        _sut = new CreateShortUrlUseCase(_repo.Object, _generator.Object, _dispatcher.Object);
+    }
+
+    private static CreateShortUrlRequest CustomCodeRequest(
+        string url = ValidUrl,
+        string customCode = ValidCustomCode,
+        DateTime? expiresAt = null) =>
+        new(url, expiresAt, customCode);
+
+    [Fact]
+    public async Task ExecuteAsync_WithValidUrlAndCustomCode_ReturnsSuccessWithCustomCode()
+    {
+        var result = await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ShortCode.Should().Be(ValidCustomCode);
+        result.Value.OriginalUrl.Should().Be(ValidUrl);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithValidUrlAndExpiration_ReturnsSuccessWithExpiration()
+    {
+        var expiresAt = DateTime.UtcNow.AddHours(1);
+
+        var result = await _sut.ExecuteAsync(CustomCodeRequest(expiresAt: expiresAt), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ExpiresAt.Should().Be(expiresAt);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithCustomCode_DoesNotCallCodeGenerator()
+    {
+        await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        _generator.Verify(
+            g => g.GenerateAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OnSuccess_CallsAddAsyncAndSaveChangesAsyncInOrder()
+    {
+        await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        _callLog.Should().ContainInConsecutiveOrder("Add", "Save");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OnSuccess_CallsDispatcherWithEmptyEventsAfterSave()
+    {
+        IEnumerable<IDomainEvent>? capturedEvents = null;
+        _dispatcher
+            .Setup(d => d.DispatchAsync(It.IsAny<IEnumerable<IDomainEvent>>(), It.IsAny<CancellationToken>()))
+            .Callback<IEnumerable<IDomainEvent>, CancellationToken>((events, _) =>
+            {
+                _callLog.Add("Dispatch");
+                capturedEvents = events.ToList();
+            })
+            .Returns(Task.CompletedTask);
+
+        await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        capturedEvents.Should().NotBeNull().And.BeEmpty();
+        _callLog.Should().ContainInConsecutiveOrder("Save", "Dispatch");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OnSuccess_ClearsDomainEventsAfterDispatch()
+    {
+        ShortUrl? added = null;
+        _repo
+            .Setup(r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()))
+            .Callback<ShortUrl, CancellationToken>((s, _) =>
+            {
+                _callLog.Add("Add");
+                added = s;
+            })
+            .Returns(Task.CompletedTask);
+
+        await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        added.Should().NotBeNull();
+        added!.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_OnSuccess_ResponseFieldsMatchEntity()
+    {
+        ShortUrl? added = null;
+        _repo
+            .Setup(r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()))
+            .Callback<ShortUrl, CancellationToken>((s, _) =>
+            {
+                _callLog.Add("Add");
+                added = s;
+            })
+            .Returns(Task.CompletedTask);
+
+        var result = await _sut.ExecuteAsync(CustomCodeRequest(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        added.Should().NotBeNull();
+        result.Value.Id.Should().Be(added!.Id);
+        result.Value.ShortCode.Should().Be(added.ShortCode.ToString());
+        result.Value.OriginalUrl.Should().Be(added.OriginalUrl.ToString());
+        result.Value.CreatedAt.Should().Be(added.CreatedAt);
+        result.Value.ExpiresAt.Should().Be(added.ExpiresAt);
+    }
+}
