@@ -24,7 +24,7 @@ public class Base62ShortCodeGeneratorTests
     {
         var code = await _sut.GenerateAsync(CancellationToken.None);
 
-        code.ToString().Should().OnlyContain(c => Alphabet.Contains(c));
+        code.ToString().ToCharArray().Should().OnlyContain(c => Alphabet.Contains(c));
     }
 
     [Fact]
