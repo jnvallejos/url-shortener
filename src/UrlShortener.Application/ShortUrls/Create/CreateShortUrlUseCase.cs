@@ -1,5 +1,6 @@
 using UrlShortener.Application.Abstractions;
 using UrlShortener.Application.Common;
+using UrlShortener.Domain.Exceptions;
 using UrlShortener.Domain.ShortUrls;
 
 namespace UrlShortener.Application.ShortUrls.Create;
@@ -24,11 +25,40 @@ public sealed class CreateShortUrlUseCase
         CreateShortUrlRequest request,
         CancellationToken ct)
     {
-        var originalUrl = OriginalUrl.Create(request.OriginalUrl);
+        OriginalUrl originalUrl;
+        try
+        {
+            originalUrl = OriginalUrl.Create(request.OriginalUrl);
+        }
+        catch (InvalidOriginalUrlException ex)
+        {
+            return Errors.OriginalUrl.Invalid(ex.Message);
+        }
 
-        var shortCode = ShortCode.Create(request.CustomCode!);
+        ShortCode shortCode;
+        try
+        {
+            shortCode = ShortCode.Create(request.CustomCode!);
+        }
+        catch (InvalidShortCodeException ex)
+        {
+            return Errors.ShortCode.Invalid(ex.Message);
+        }
 
-        var shortUrl = ShortUrl.Create(shortCode, originalUrl, request.ExpiresAt);
+        if (await _repo.ExistsByCodeAsync(shortCode, ct))
+        {
+            return Errors.ShortUrl.CodeAlreadyExists(shortCode.ToString());
+        }
+
+        ShortUrl shortUrl;
+        try
+        {
+            shortUrl = ShortUrl.Create(shortCode, originalUrl, request.ExpiresAt);
+        }
+        catch (DomainException ex)
+        {
+            return Errors.Validation.InvalidExpiration(ex.Message);
+        }
 
         await _repo.AddAsync(shortUrl, ct);
         await _repo.SaveChangesAsync(ct);
