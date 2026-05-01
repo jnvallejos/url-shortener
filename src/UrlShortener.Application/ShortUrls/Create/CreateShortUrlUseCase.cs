@@ -7,6 +7,8 @@ namespace UrlShortener.Application.ShortUrls.Create;
 
 public sealed class CreateShortUrlUseCase
 {
+    private const int MaxCodeGenerationAttempts = 5;
+
     private readonly IShortUrlRepository _repo;
     private readonly IShortCodeGenerator _generator;
     private readonly IDomainEventDispatcher _dispatcher;
@@ -35,19 +37,40 @@ public sealed class CreateShortUrlUseCase
             return Errors.OriginalUrl.Invalid(ex.Message);
         }
 
-        ShortCode shortCode;
-        try
+        ShortCode? shortCode;
+        if (!string.IsNullOrWhiteSpace(request.CustomCode))
         {
-            shortCode = ShortCode.Create(request.CustomCode!);
-        }
-        catch (InvalidShortCodeException ex)
-        {
-            return Errors.ShortCode.Invalid(ex.Message);
-        }
+            try
+            {
+                shortCode = ShortCode.Create(request.CustomCode);
+            }
+            catch (InvalidShortCodeException ex)
+            {
+                return Errors.ShortCode.Invalid(ex.Message);
+            }
 
-        if (await _repo.ExistsByCodeAsync(shortCode, ct))
+            if (await _repo.ExistsByCodeAsync(shortCode, ct))
+            {
+                return Errors.ShortUrl.CodeAlreadyExists(shortCode.ToString());
+            }
+        }
+        else
         {
-            return Errors.ShortUrl.CodeAlreadyExists(shortCode.ToString());
+            shortCode = null;
+            for (var attempt = 0; attempt < MaxCodeGenerationAttempts; attempt++)
+            {
+                var candidate = await _generator.GenerateAsync(ct);
+                if (!await _repo.ExistsByCodeAsync(candidate, ct))
+                {
+                    shortCode = candidate;
+                    break;
+                }
+            }
+
+            if (shortCode is null)
+            {
+                return Errors.ShortUrl.CodeGenerationFailed;
+            }
         }
 
         ShortUrl shortUrl;
