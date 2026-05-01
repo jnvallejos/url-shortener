@@ -77,9 +77,17 @@ public sealed class ShortUrl : Entity
             IpAddress: ipAddress));
     }
 
-    public void Disable() => IsEnabled = false;
+    public void Disable()
+    {
+        if (!IsEnabled) return;
+        IsEnabled = false;
+    }
 
-    public void Enable() => IsEnabled = true;
+    public void Enable()
+    {
+        if (IsEnabled) return;
+        IsEnabled = true;
+    }
 
     public void UpdateExpiration(DateTime? newExpiresAt)
     {
