@@ -2,7 +2,7 @@
 
 A .NET 9 reference implementation of a URL shortener service, built as a portfolio piece demonstrating Clean Architecture, TDD, and modern .NET practices.
 
-**Status: work in progress.** Phases 1 (Domain) and 2 (Application) are complete. Subsequent phases will add Infrastructure (EF Core + PostgreSQL), API (ASP.NET Core Minimal APIs), and CI.
+**Status: work in progress.** Phases 1 (Domain), 2 (Application), and 3 (Infrastructure) are complete. Subsequent phases will add the API (ASP.NET Core Minimal APIs) and CI.
 
 ## Tech stack
 
@@ -28,6 +28,17 @@ A .NET 9 reference implementation of a URL shortener service, built as a portfol
 - Abstractions for Phase 3: `IShortUrlRepository`, `IShortCodeGenerator`, `IDateTimeProvider`, `IDomainEventDispatcher`
 - `services.AddApplication()` extension for DI wiring
 - 60 Application unit tests (Moq + FluentAssertions), all green
+
+## Phase 3 progress
+
+- Infrastructure layer with EF Core 9 and PostgreSQL (Npgsql)
+- Concrete implementations of every Phase 2 abstraction: `EfShortUrlRepository`, `Base62ShortCodeGenerator`, `SystemDateTimeProvider`, `DomainEventDispatcher`
+- `ApplicationDbContext` with entity configurations that map value objects (`ShortCode`, `OriginalUrl`) via `HasConversion`
+- Domain event handler `ShortUrlClickedEventHandler` writing audit rows to the `ClickAudits` table
+- Three admin use cases added to the Application layer: `DisableShortUrlUseCase`, `EnableShortUrlUseCase`, `UpdateExpirationUseCase`
+- `services.AddInfrastructure(connectionString)` extension wiring everything for the host
+- Initial EF migration committed; round-trip and end-to-end integration tests run against SQLite in-memory
+- 49 Infrastructure tests (unit + integration) plus 33 new Application tests, all green
 
 ## Build and test
 
