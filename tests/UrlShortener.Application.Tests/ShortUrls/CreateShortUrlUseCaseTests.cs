@@ -274,4 +274,134 @@ public class CreateShortUrlUseCaseTests
             r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
             Times.Never);
     }
+
+    private static CreateShortUrlRequest GeneratedCodeRequest(
+        string url = ValidUrl,
+        DateTime? expiresAt = null) =>
+        new(url, expiresAt, null);
+
+    private static ShortCode FreshCode(string value) => ShortCode.Create(value);
+
+    [Fact]
+    public async Task ExecuteAsync_WithValidUrlAndNoCustomCode_ReturnsSuccessWithGeneratedCode()
+    {
+        const string generated = "gen0001";
+        _generator
+            .Setup(g => g.GenerateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FreshCode(generated));
+
+        var result = await _sut.ExecuteAsync(GeneratedCodeRequest(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ShortCode.Should().Be(generated);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WithoutCustomCode_CallsCodeGenerator()
+    {
+        _generator
+            .Setup(g => g.GenerateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FreshCode("gen0001"));
+
+        await _sut.ExecuteAsync(GeneratedCodeRequest(), CancellationToken.None);
+
+        _generator.Verify(
+            g => g.GenerateAsync(It.IsAny<CancellationToken>()),
+            Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGeneratedCodeCollidesOnce_RetriesAndSucceedsOnSecondAttempt()
+    {
+        _generator
+            .SetupSequence(g => g.GenerateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(FreshCode("first01"))
+            .ReturnsAsync(FreshCode("second2"));
+
+        _repo
+            .SetupSequence(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true)
+            .ReturnsAsync(false);
+
+        var result = await _sut.ExecuteAsync(GeneratedCodeRequest(), CancellationToken.None);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.ShortCode.Should().Be("second2");
+        _generator.Verify(
+            g => g.GenerateAsync(It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenAllAttemptsCollide_ReturnsFailureWithCodeGenerationFailed()
+    {
+        _generator
+            .Setup(g => g.GenerateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => FreshCode("collide"));
+
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        var result = await _sut.ExecuteAsync(GeneratedCodeRequest(), CancellationToken.None);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("ShortUrl.CodeGenerationFailed");
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenAllAttemptsCollide_DoesNotCallAddOrSave()
+    {
+        _generator
+            .Setup(g => g.GenerateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => FreshCode("collide"));
+
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await _sut.ExecuteAsync(GeneratedCodeRequest(), CancellationToken.None);
+
+        _repo.Verify(
+            r => r.AddAsync(It.IsAny<ShortUrl>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _repo.Verify(
+            r => r.SaveChangesAsync(It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenGeneratorRetries_DoesNotExceedMaxAttempts()
+    {
+        const int expectedMaxAttempts = 5;
+
+        _generator
+            .Setup(g => g.GenerateAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => FreshCode("collide"));
+
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        await _sut.ExecuteAsync(GeneratedCodeRequest(), CancellationToken.None);
+
+        _generator.Verify(
+            g => g.GenerateAsync(It.IsAny<CancellationToken>()),
+            Times.Exactly(expectedMaxAttempts));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenCancellationRequested_PropagatesOperationCanceledException()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        _repo
+            .Setup(r => r.ExistsByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException(cts.Token));
+
+        Func<Task> act = () => _sut.ExecuteAsync(CustomCodeRequest(), cts.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
 }
