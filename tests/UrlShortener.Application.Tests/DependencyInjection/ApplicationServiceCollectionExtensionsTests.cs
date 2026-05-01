@@ -3,6 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using UrlShortener.Application.Abstractions;
 using UrlShortener.Application.DependencyInjection;
+using UrlShortener.Application.ShortUrls.Admin.Disable;
+using UrlShortener.Application.ShortUrls.Admin.Enable;
+using UrlShortener.Application.ShortUrls.Admin.UpdateExpiration;
 using UrlShortener.Application.ShortUrls.Create;
 using UrlShortener.Application.ShortUrls.GetByCode;
 using UrlShortener.Application.ShortUrls.Redirect;
@@ -52,6 +55,36 @@ public class ApplicationServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddApplication_RegistersDisableShortUrlUseCase()
+    {
+        var services = new ServiceCollection();
+
+        services.AddApplication();
+
+        services.Should().Contain(d => d.ServiceType == typeof(DisableShortUrlUseCase));
+    }
+
+    [Fact]
+    public void AddApplication_RegistersEnableShortUrlUseCase()
+    {
+        var services = new ServiceCollection();
+
+        services.AddApplication();
+
+        services.Should().Contain(d => d.ServiceType == typeof(EnableShortUrlUseCase));
+    }
+
+    [Fact]
+    public void AddApplication_RegistersUpdateExpirationUseCase()
+    {
+        var services = new ServiceCollection();
+
+        services.AddApplication();
+
+        services.Should().Contain(d => d.ServiceType == typeof(UpdateExpirationUseCase));
+    }
+
+    [Fact]
     public void AddApplication_AfterMockingAbstractions_AllUseCasesResolveFromProvider()
     {
         var services = BuildServicesWithMockedAbstractions();
@@ -63,5 +96,8 @@ public class ApplicationServiceCollectionExtensionsTests
         scope.ServiceProvider.GetRequiredService<CreateShortUrlUseCase>().Should().NotBeNull();
         scope.ServiceProvider.GetRequiredService<RedirectUseCase>().Should().NotBeNull();
         scope.ServiceProvider.GetRequiredService<GetShortUrlUseCase>().Should().NotBeNull();
+        scope.ServiceProvider.GetRequiredService<DisableShortUrlUseCase>().Should().NotBeNull();
+        scope.ServiceProvider.GetRequiredService<EnableShortUrlUseCase>().Should().NotBeNull();
+        scope.ServiceProvider.GetRequiredService<UpdateExpirationUseCase>().Should().NotBeNull();
     }
 }
