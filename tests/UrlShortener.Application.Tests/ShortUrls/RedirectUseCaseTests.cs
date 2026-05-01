@@ -241,8 +241,9 @@ public class RedirectUseCaseTests
     [Fact]
     public async Task ExecuteAsync_WhenShortUrlIsExpired_ReturnsFailureWithExpired()
     {
-        var entity = ActiveShortUrl(expiresAt: _now.AddMinutes(10));
-        _clock.SetupGet(c => c.UtcNow).Returns(_now.AddHours(1));
+        var futureExpiration = DateTime.UtcNow.AddMinutes(10);
+        var entity = ActiveShortUrl(expiresAt: futureExpiration);
+        _clock.SetupGet(c => c.UtcNow).Returns(futureExpiration.AddSeconds(1));
         _repo
             .Setup(r => r.GetByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(entity);
@@ -256,8 +257,9 @@ public class RedirectUseCaseTests
     [Fact]
     public async Task ExecuteAsync_WhenShortUrlIsExpired_DoesNotCallSaveOrDispatch()
     {
-        var entity = ActiveShortUrl(expiresAt: _now.AddMinutes(10));
-        _clock.SetupGet(c => c.UtcNow).Returns(_now.AddHours(1));
+        var futureExpiration = DateTime.UtcNow.AddMinutes(10);
+        var entity = ActiveShortUrl(expiresAt: futureExpiration);
+        _clock.SetupGet(c => c.UtcNow).Returns(futureExpiration.AddSeconds(1));
         _repo
             .Setup(r => r.GetByCodeAsync(It.IsAny<ShortCode>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(entity);
