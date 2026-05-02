@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
+using Scalar.AspNetCore;
 using UrlShortener.Api.Configuration;
 using UrlShortener.Api.Contracts;
 using UrlShortener.Api.Endpoints;
@@ -76,6 +77,11 @@ app.UseRateLimiter();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("URL Shortener API");
+        options.WithTheme(ScalarTheme.Default);
+    });
 }
 
 app.MapShortUrlsEndpoints();
