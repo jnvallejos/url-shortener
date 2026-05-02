@@ -14,6 +14,7 @@ builder.Services.AddInfrastructure(connectionString);
 var app = builder.Build();
 
 app.MapShortUrlsEndpoints();
+app.MapRedirectEndpoint();
 
 app.Run();
 
