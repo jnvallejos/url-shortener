@@ -1,21 +1,10 @@
 # url-shortener
 
-A .NET 9 reference implementation of a URL shortener service, built as a portfolio piece demonstrating Clean Architecture, TDD, and modern .NET practices.
+[![CI](https://github.com/jnvallejos/url-shortener/actions/workflows/ci.yml/badge.svg)](https://github.com/jnvallejos/url-shortener/actions/workflows/ci.yml)
 
-**Status: work in progress.** Phases 1 (Domain), 2 (Application), 3 (Infrastructure), and 4 (API) are complete. Remaining work is Phase 5: GitHub Actions CI, README polish, and MIT license.
+A reference URL shortener built end-to-end in .NET 9 to demonstrate Clean Architecture, Test-Driven Development, and modern .NET API practices. Every behavior is driven by tests; every dependency points inward. The repo is deliberately small in scope and large in care.
 
-## What this demonstrates
-
-- Clean Architecture with strict layer boundaries (Domain depends on nothing; Application depends on Domain; Infrastructure depends on Application; API depends on Application + Infrastructure)
-- Test-Driven Development with granular conventional commits
-- Domain modeling with value objects, aggregate roots, domain events, and contextual exception messages
-- Result pattern for use case error handling (no domain exceptions cross the Application boundary)
-- Repository abstraction with EF Core 9 implementation
-- Domain event dispatcher with handler registration via DI and reflection-based invocation
-- EF Core value object conversions, unique indexes, and migrations
-- Integration testing with SQLite in-memory plus end-to-end test wiring real components
-- Functional API testing via `WebApplicationFactory<Program>` against the full ASP.NET Core pipeline
-- Minimal APIs with route constraints, fixed-window rate limiting, OpenAPI document generation, Scalar UI, structured logging, and Result-to-HTTP error mapping
+**Status: complete.** All five phases shipped: Domain, Application, Infrastructure, API, and CI/polish.
 
 ## Tech stack
 
@@ -24,16 +13,64 @@ A .NET 9 reference implementation of a URL shortener service, built as a portfol
 - EF Core 9 (Npgsql for PostgreSQL in production, SQLite in-memory for tests)
 - xUnit, FluentAssertions, Moq, `Microsoft.AspNetCore.Mvc.Testing`
 - Microsoft.Extensions.DependencyInjection
+- GitHub Actions for CI (build + test + coverage artifact on every push and PR)
+
+## Quick start
+
+```shell
+git clone https://github.com/jnvallejos/url-shortener.git
+cd url-shortener
+dotnet restore
+dotnet test
+```
+
+To run the API against PostgreSQL:
+
+```shell
+dotnet ef database update --project src/UrlShortener.Infrastructure --startup-project src/UrlShortener.Api
+dotnet run --project src/UrlShortener.Api
+```
+
+The OpenAPI document is at `/openapi/v1.json` and Scalar UI at `/scalar/v1` in Development.
+
+The connection string lives in `src/UrlShortener.Api/appsettings.json` and can be overridden via the `ConnectionStrings__DefaultConnection` environment variable.
 
 ## Architecture
 
+```mermaid
+graph TD
+    Api["UrlShortener.Api<br/>(Minimal APIs, OpenAPI, rate limiting, logging)"]
+    Infrastructure["UrlShortener.Infrastructure<br/>(EF Core 9, Npgsql, dispatcher, handlers)"]
+    Application["UrlShortener.Application<br/>(use cases, Result&lt;T&gt;, abstractions)"]
+    Domain["UrlShortener.Domain<br/>(entities, value objects, domain events)"]
+
+    Api --> Infrastructure
+    Api --> Application
+    Infrastructure --> Application
+    Application --> Domain
+
+    classDef api fill:#1f6feb,stroke:#1f6feb,color:#fff
+    classDef infra fill:#bf8700,stroke:#bf8700,color:#fff
+    classDef app fill:#2da44e,stroke:#2da44e,color:#fff
+    classDef domain fill:#a371f7,stroke:#a371f7,color:#fff
+
+    class Api api
+    class Infrastructure infra
+    class Application app
+    class Domain domain
+```
+
 ```
 url-shortener/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── docs/
 │   ├── phase-1-spec.md
 │   ├── phase-2-spec.md
 │   ├── phase-3-spec.md
-│   └── phase-4-spec.md
+│   ├── phase-4-spec.md
+│   └── phase-5-spec.md
 ├── src/
 │   ├── UrlShortener.Domain/                    # zero external deps
 │   │   ├── Common/                             # Entity, ValueObject, IDomainEvent
@@ -90,15 +127,9 @@ url-shortener/
 │       ├── RateLimiting/                       # RedirectRateLimitTests
 │       └── TestSupport/                        # ApiWebApplicationFactory, TestClock,
 │                                               #   RateLimitedApiFactory, DevelopmentApiFactory
+├── LICENSE
 └── UrlShortener.sln
 ```
-
-## Use cases shipped
-
-- CreateShortUrl (with custom code support and Base62 generator retry on collision)
-- Redirect (validates state, registers click, dispatches domain event, persists audit log)
-- GetShortUrl (read-only by code, indifferent to disabled/expired state)
-- DisableShortUrl, EnableShortUrl, UpdateExpiration (admin operations)
 
 ## HTTP endpoints
 
@@ -113,8 +144,6 @@ url-shortener/
 
 The redirect route is constrained to 7-character Base62 codes (`length(7):regex(^[A-Za-z0-9]+$)`) and protected by a fixed-window rate limiter (100 req/min per IP, configurable). Errors from the Application layer are mapped to HTTP status codes via `ErrorToHttpResultMapper`, switching on `Error.Code` (the stable contract) — never on the message text.
 
-In Development, the OpenAPI document is served at `/openapi/v1.json` and Scalar UI at `/scalar/v1`.
-
 ## Test coverage
 
 283 tests, all green (2 functional tests skipped with documented justifications):
@@ -124,6 +153,18 @@ In Development, the OpenAPI document is served at `/openapi/v1.json` and Scalar 
 - 49 Infrastructure tests (mix of unit and integration with SQLite in-memory, including end-to-end redirect flow)
 - 57 API functional tests via `WebApplicationFactory<Program>` (SQLite in-memory swap, controllable test clock, rate-limit and OpenAPI-document coverage)
 
+## Why this design
+
+**Clean Architecture with strict layer boundaries.** The Domain has zero external dependencies (not even `Microsoft.Extensions.*`). The Application depends only on the Domain. The Infrastructure depends on the Application abstractions. The API consumes both. This isn't ceremony — it's what makes the test pyramid honest: 84 of the 283 tests run against pure C# with no mocks of any infrastructure concern.
+
+**Test-Driven Development with granular commits.** The commit log shows the red-green-refactor cycle: `test(...)` then `feat(...)` for each behavior. Reviewers can `git log --oneline` and follow the design as it emerged. No surprise commits where 500 lines land at once.
+
+**Result pattern at the Application boundary.** Domain exceptions are caught inside use cases and converted to `Result<T>` with a stable `Error.Code`. The API maps codes to HTTP statuses by switch expression — never on message text or exception type. This means new error codes don't break the HTTP layer; missing mappings degrade to 500 explicitly.
+
+**Domain events without an outbox.** Events are dispatched in-process after `SaveChangesAsync` succeeds, with the limitation that handler failures lose the event. The trade-off is documented in the Phase 2 spec; an outbox pattern would land if event durability became a real requirement.
+
+**No MediatR, no AutoMapper, no FluentValidation.** Each adds a layer of indirection that small codebases pay for in cognition more than they save in code. Use cases are plain classes. Mapping is manual. Validation lives in value objects. The dependency list is short on purpose.
+
 ## Build and test
 
 Run from repo root:
@@ -132,6 +173,8 @@ Run from repo root:
 dotnet build
 dotnet test
 ```
+
+CI (`.github/workflows/ci.yml`) runs the same flow in `Release` configuration on every push to `main` and every pull request, collects Cobertura coverage with the XPlat collector, and uploads it as a workflow artifact.
 
 ## Run the API locally
 
@@ -146,8 +189,8 @@ The API does not auto-migrate at startup by design (Phase 4 spec section 8.4). F
 
 ## Roadmap
 
-- Phase 5: GitHub Actions CI, public-facing README polish, MIT license
+Phase 5 (CI, polish, license) is complete. The repo is portfolio-ready.
 
 ## License
 
-MIT (to be added in Phase 5).
+MIT — see [LICENSE](LICENSE).
