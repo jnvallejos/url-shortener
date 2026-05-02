@@ -1,5 +1,7 @@
 using UrlShortener.Api.Contracts;
 using UrlShortener.Api.ErrorMapping;
+using UrlShortener.Application.ShortUrls.Admin.Disable;
+using UrlShortener.Application.ShortUrls.Admin.Enable;
 using UrlShortener.Application.ShortUrls.Create;
 using UrlShortener.Application.ShortUrls.GetByCode;
 
@@ -17,7 +19,43 @@ public static class ShortUrlsEndpoints
         group.MapGet("/{code}", GetShortUrlAsync)
             .WithName("GetShortUrl");
 
+        group.MapPost("/{code}/disable", DisableShortUrlAsync)
+            .WithName("DisableShortUrl");
+
+        group.MapPost("/{code}/enable", EnableShortUrlAsync)
+            .WithName("EnableShortUrl");
+
         return endpoints;
+    }
+
+    private static async Task<IResult> DisableShortUrlAsync(
+        string code,
+        HttpContext httpContext,
+        DisableShortUrlUseCase useCase,
+        CancellationToken ct)
+    {
+        var result = await useCase.ExecuteAsync(new DisableShortUrlRequest(code), ct);
+        if (result.IsFailure)
+        {
+            return ErrorToHttpResultMapper.ToHttpResult(result.Error, httpContext.TraceIdentifier);
+        }
+
+        return Results.Ok(new ShortUrlStateContract(result.Value.Code, result.Value.IsEnabled));
+    }
+
+    private static async Task<IResult> EnableShortUrlAsync(
+        string code,
+        HttpContext httpContext,
+        EnableShortUrlUseCase useCase,
+        CancellationToken ct)
+    {
+        var result = await useCase.ExecuteAsync(new EnableShortUrlRequest(code), ct);
+        if (result.IsFailure)
+        {
+            return ErrorToHttpResultMapper.ToHttpResult(result.Error, httpContext.TraceIdentifier);
+        }
+
+        return Results.Ok(new ShortUrlStateContract(result.Value.Code, result.Value.IsEnabled));
     }
 
     private static async Task<IResult> GetShortUrlAsync(
