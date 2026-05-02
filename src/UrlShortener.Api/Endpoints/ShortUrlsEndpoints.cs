@@ -2,6 +2,7 @@ using UrlShortener.Api.Contracts;
 using UrlShortener.Api.ErrorMapping;
 using UrlShortener.Application.ShortUrls.Admin.Disable;
 using UrlShortener.Application.ShortUrls.Admin.Enable;
+using UrlShortener.Application.ShortUrls.Admin.UpdateExpiration;
 using UrlShortener.Application.ShortUrls.Create;
 using UrlShortener.Application.ShortUrls.GetByCode;
 
@@ -25,7 +26,35 @@ public static class ShortUrlsEndpoints
         group.MapPost("/{code}/enable", EnableShortUrlAsync)
             .WithName("EnableShortUrl");
 
+        group.MapPatch("/{code}/expiration", UpdateExpirationAsync)
+            .WithName("UpdateExpiration");
+
         return endpoints;
+    }
+
+    private static async Task<IResult> UpdateExpirationAsync(
+        string code,
+        UpdateExpirationContract? request,
+        HttpContext httpContext,
+        UpdateExpirationUseCase useCase,
+        CancellationToken ct)
+    {
+        if (request is null)
+        {
+            return Results.BadRequest(new ErrorResponse(
+                "Request.Missing",
+                "Request body is required",
+                httpContext.TraceIdentifier));
+        }
+
+        var useCaseRequest = new UpdateExpirationRequest(code, request.NewExpiresAt);
+        var result = await useCase.ExecuteAsync(useCaseRequest, ct);
+        if (result.IsFailure)
+        {
+            return ErrorToHttpResultMapper.ToHttpResult(result.Error, httpContext.TraceIdentifier);
+        }
+
+        return Results.Ok(new ShortUrlExpirationContract(result.Value.Code, result.Value.ExpiresAt));
     }
 
     private static async Task<IResult> DisableShortUrlAsync(
