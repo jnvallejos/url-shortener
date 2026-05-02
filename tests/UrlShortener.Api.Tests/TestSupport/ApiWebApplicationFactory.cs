@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using UrlShortener.Infrastructure.Persistence;
 
 namespace UrlShortener.Api.Tests.TestSupport;
@@ -23,9 +25,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.SingleOrDefault(d =>
-                d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
-            if (descriptor is not null) services.Remove(descriptor);
+            services.RemoveAll(typeof(DbContextOptions<ApplicationDbContext>));
+            services.RemoveAll(typeof(IDbContextOptionsConfiguration<ApplicationDbContext>));
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite(_connection));

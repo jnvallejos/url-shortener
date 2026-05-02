@@ -1,3 +1,4 @@
+using UrlShortener.Api.Endpoints;
 using UrlShortener.Application.DependencyInjection;
 using UrlShortener.Infrastructure.DependencyInjection;
 
@@ -11,6 +12,8 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString);
 
 var app = builder.Build();
+
+app.MapShortUrlsEndpoints();
 
 app.Run();
 
