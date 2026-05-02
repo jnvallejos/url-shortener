@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using UrlShortener.Api.ErrorMapping;
 using UrlShortener.Application.ShortUrls.Redirect;
 
@@ -8,7 +9,8 @@ public static class RedirectEndpoint
     public static IEndpointRouteBuilder MapRedirectEndpoint(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/{code:length(7):regex(^[A-Za-z0-9]+$)}", RedirectAsync)
-            .WithName("Redirect");
+            .WithName("Redirect")
+            .RequireRateLimiting("redirect");
 
         return endpoints;
     }
