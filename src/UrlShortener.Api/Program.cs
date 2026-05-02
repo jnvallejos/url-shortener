@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.OpenApi.Models;
 using UrlShortener.Api.Configuration;
 using UrlShortener.Api.Contracts;
 using UrlShortener.Api.Endpoints;
@@ -14,6 +15,21 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString);
+
+builder.Services.AddOpenApi("v1", options =>
+{
+    options.AddDocumentTransformer((document, context, ct) =>
+    {
+        document.Info = new OpenApiInfo
+        {
+            Title = "URL Shortener API",
+            Version = "v1",
+            Description = "Reference URL shortener built with Clean Architecture and TDD.",
+            License = new OpenApiLicense { Name = "MIT" }
+        };
+        return Task.CompletedTask;
+    });
+});
 
 builder.Services.Configure<RateLimitingOptions>(
     builder.Configuration.GetSection("RateLimiting"));
@@ -56,6 +72,11 @@ builder.Services.AddRateLimiter(options =>
 var app = builder.Build();
 
 app.UseRateLimiter();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
 
 app.MapShortUrlsEndpoints();
 app.MapRedirectEndpoint();

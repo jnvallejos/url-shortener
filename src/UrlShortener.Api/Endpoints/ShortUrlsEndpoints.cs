@@ -12,22 +12,48 @@ public static class ShortUrlsEndpoints
 {
     public static IEndpointRouteBuilder MapShortUrlsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/shorturls");
+        var group = endpoints.MapGroup("/api/shorturls").WithTags("ShortUrls");
 
         group.MapPost("/", CreateShortUrlAsync)
-            .WithName("CreateShortUrl");
+            .WithName("CreateShortUrl")
+            .WithSummary("Create a new shortened URL")
+            .WithDescription("Generates a 7-character Base62 code (or accepts a custom code) and persists the short URL.")
+            .Produces<ShortUrlContract>(StatusCodes.Status201Created)
+            .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ErrorResponse>(StatusCodes.Status409Conflict)
+            .Produces<ErrorResponse>(StatusCodes.Status503ServiceUnavailable);
 
         group.MapGet("/{code}", GetShortUrlAsync)
-            .WithName("GetShortUrl");
+            .WithName("GetShortUrl")
+            .WithSummary("Get a short URL by code")
+            .WithDescription("Returns the full short URL record including state and click count. Read-only; does not register a click.")
+            .Produces<ShortUrlContract>(StatusCodes.Status200OK)
+            .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ErrorResponse>(StatusCodes.Status404NotFound);
 
         group.MapPost("/{code}/disable", DisableShortUrlAsync)
-            .WithName("DisableShortUrl");
+            .WithName("DisableShortUrl")
+            .WithSummary("Disable a short URL")
+            .WithDescription("Marks the short URL as disabled. Idempotent.")
+            .Produces<ShortUrlStateContract>(StatusCodes.Status200OK)
+            .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ErrorResponse>(StatusCodes.Status404NotFound);
 
         group.MapPost("/{code}/enable", EnableShortUrlAsync)
-            .WithName("EnableShortUrl");
+            .WithName("EnableShortUrl")
+            .WithSummary("Enable a short URL")
+            .WithDescription("Marks the short URL as enabled. Idempotent.")
+            .Produces<ShortUrlStateContract>(StatusCodes.Status200OK)
+            .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ErrorResponse>(StatusCodes.Status404NotFound);
 
         group.MapPatch("/{code}/expiration", UpdateExpirationAsync)
-            .WithName("UpdateExpiration");
+            .WithName("UpdateExpiration")
+            .WithSummary("Update or clear a short URL's expiration")
+            .WithDescription("Sets a new expiration timestamp (must be in the future) or clears it when null is provided.")
+            .Produces<ShortUrlExpirationContract>(StatusCodes.Status200OK)
+            .Produces<ErrorResponse>(StatusCodes.Status400BadRequest)
+            .Produces<ErrorResponse>(StatusCodes.Status404NotFound);
 
         return endpoints;
     }
