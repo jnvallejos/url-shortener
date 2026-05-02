@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.RateLimiting;
 using UrlShortener.Api.Contracts;
 using UrlShortener.Api.ErrorMapping;
+using UrlShortener.Application.Common;
 using UrlShortener.Application.ShortUrls.Redirect;
 
 namespace UrlShortener.Api.Endpoints;
@@ -27,8 +28,11 @@ public static class RedirectEndpoint
         string code,
         HttpContext httpContext,
         RedirectUseCase useCase,
+        ILogger<RedirectEndpointLog> logger,
         CancellationToken ct)
     {
+        logger.LogInformation("Resolving redirect for {ShortCode}", code);
+
         var request = new RedirectRequest(
             Code:      code,
             UserAgent: httpContext.Request.Headers.UserAgent.ToString(),
@@ -37,9 +41,29 @@ public static class RedirectEndpoint
         var result = await useCase.ExecuteAsync(request, ct);
         if (result.IsFailure)
         {
+            LogFailure(logger, result.Error);
             return ErrorToHttpResultMapper.ToHttpResult(result.Error, httpContext.TraceIdentifier);
         }
 
+        logger.LogInformation("Redirecting {ShortCode} to {OriginalUrl}", code, result.Value.OriginalUrl);
         return Results.Redirect(result.Value.OriginalUrl, permanent: false, preserveMethod: false);
     }
+
+    private static void LogFailure(ILogger logger, Error error)
+    {
+        switch (error.Code)
+        {
+            case "ShortUrl.NotFound":
+            case "ShortUrl.Disabled":
+            case "ShortUrl.Expired":
+            case "ShortCode.Invalid":
+                logger.LogInformation("Redirect failed: {ErrorCode} {ErrorMessage}", error.Code, error.Message);
+                break;
+            default:
+                logger.LogError("Redirect failed with unmapped error: {ErrorCode} {ErrorMessage}", error.Code, error.Message);
+                break;
+        }
+    }
 }
+
+internal sealed class RedirectEndpointLog;
