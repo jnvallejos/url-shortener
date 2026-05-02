@@ -73,6 +73,15 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>
         return await action(ctx);
     }
 
+    public async Task SetExpirationRawAsync(string code, DateTime? expiresAt)
+    {
+        using var scope = Services.CreateScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await ctx.Database.ExecuteSqlRawAsync(
+            "UPDATE ShortUrls SET ExpiresAt = {0} WHERE ShortCode = {1}",
+            (object?)expiresAt ?? DBNull.Value, code);
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing)
